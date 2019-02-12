@@ -14,7 +14,7 @@
 #include <vector>
 #include <cerrno>
 #include <cstring>
-
+#include <functional>
 
 /**
  * @brief Class for managing ncurses
@@ -52,17 +52,18 @@ public:
  * @detail
  *
  */
-template<typename T>
+template<typename T, typename... R>
 class UserPtr_t : public UserPtr { // Templated type (_t)
 private:
   T & action; // A callable object 
   Menu & oldmenu;
+  std::tuple<R...> data;
   
 public:
   // Constructor for generic callable function
-  UserPtr_t(T & action, Menu & oldmenu)
-    : action(action), oldmenu(oldmenu) { }
-  
+  UserPtr_t(T & action, Menu & oldmenu, R... data)
+    : action(action), oldmenu(oldmenu), data(data...) { }
+
   void execute() {
     action(); // 
   }
@@ -74,19 +75,22 @@ public:
  * @detail
  *
  */
-template<>
-class UserPtr_t<Menu> : public UserPtr { // Templated type (_t)
+template<typename... R>
+class UserPtr_t<Menu, R...> : public UserPtr { // Templated type (_t)
 private:
   Menu & submenu; // Either a submenu (Menu type) or callable object
   Menu & oldmenu;
-  
+  std::tuple<R...> data;  
+
 public:
   // Constructor for switching from one menu to another
-  UserPtr_t(Menu & submenu, Menu & oldmenu);
+  // This is a very tricky function
+  UserPtr_t(Menu & submenu, Menu & oldmenu, R... data);
   
   // Define the menu-switch function
   void execute();
 };
+
 
 /**
  * @brief Menu handling class
@@ -109,7 +113,8 @@ private:
   static int background_flag; // Set to one to stop the thread
   static int background_running; // Set to one when background is running
   std::vector<UserPtr * > user_pointers; // Holds submenu pointers
-
+  std::function<void()> go_back; // Function to go back to previous menu
+  
   WINDOW * menu_win;
     
   // Start background
@@ -168,6 +173,12 @@ private:
 	case KEY_RIGHT:
 	  menu_driver(current_menu -> menu, REQ_RIGHT_ITEM);
 	  break;
+	case KEY_DC: // Delete character 
+	  // Check if the go_back function is defined
+	  if(current_menu -> go_back != nullptr)
+	    // Execute the go_back function
+	    current_menu -> go_back();
+	  break;
 	case 10: { // Enter
 	  ITEM * cur = current_item(current_menu -> menu);
 	  if(cur == nullptr) break;
@@ -206,6 +217,10 @@ public:
   void create_menu() {
 
     // Create new menu
+    // Since std::vector<ITEM*> stores elements contiguously in
+    // memory, the required argument ITEM** is a pointer to the first
+    // element of menu_items.
+    //
     menu = new_menu(&menu_items[0]);
     if(menu == nullptr) abort();
     
@@ -213,7 +228,6 @@ public:
     menu_win = newwin(10, 75, 4, 4);
     keypad(menu_win, TRUE);
     menu_opts_off(menu, O_SHOWDESC);
-
     
     // Window properties
     set_menu_win(menu, menu_win);
@@ -223,13 +237,7 @@ public:
 
     // Box around menu
     box(menu_win, 0, 0);
-
-    // Colors
-    attron(COLOR_PAIR(1));
-    mvprintw(LINES - 3, 0, "Use PageUp and PageDown to scroll");
-    mvprintw(LINES - 2, 0, "Use Arrow Keys to navigate (F1 to Exit)");
-    attroff(COLOR_PAIR(1));
-
+    
     // Refresh
     refresh();
     
@@ -243,61 +251,41 @@ public:
 
     // This code is run from the submenu object
     
-    // It seems like you have to free the menu before messing around
-    // with menu_items
-    //unpost_menu(menu);
-    //free_menu(menu);
-
     // Store the previous menu (above the current menu)
     previous = oldmenu;
 
-    // Add the new item onto the end of menu list
-    //menu_items.insert(menu_items.end()-1, // i.e. before the nullptr
-    //		      new_item("Back", "Go back to previous menu"));
-
-    // When is this going to get deleted?
-    // Also where is it getting stored
-    //UserPtr_t<Menu> * menu_switch = new UserPtr_t<Menu>(* previous_menu, * this);
-
-    // Prepare the go-up-one-level function
-    auto go_back = [this, oldmenu]() {
+    // Set the go back function
+    //
+    // Can't directly use a lambda function because it goes
+    // out of scope at the end of this function. The go_back
+    // variable is a std::function object.
+    //
+    go_back = [this, oldmenu]() {
       this -> hide();
       oldmenu -> show();
       // Set new current menu
-      Menu::set_current_menu(oldmenu);
+      Menu::set_current_menu(previous);
     };
 
     // Add action item
-    this -> add("Back", go_back);
-    
-    // Add a new submenu pointer to the list
-    //user_pointers.push_back(new UserPtr_t<Menu>(* previous_menu, * this)); // Deleted on clear_all?
-    
-    // Associate the foreground menu action with the item
-    //set_item_userptr(* (menu_items.end() - 2), (void * )user_pointers.back());
-
-    // Create new menu
-    // Since std::vector<ITEM*> stores elements contiguously in
-    // memory, the required argument ITEM** is a pointer to the first
-    // element of menu_items.
-    //
-    //menu = new_menu(&menu_items[0]);
-    //create_menu();
+    this -> add("Back", this->go_back);
     
     // Indicate there is a back button
     back_button = 1;
 
   }
-
   
   // This method foregrounds the current menu, overwriting
   // whichever menu is currently in view
   void show() {
 
-    // Post the menu
+    // Colors
+    attron(COLOR_PAIR(2));
     mvprintw(LINES - 3, 0, "Press <ENTER> to see the option selected");
-    mvprintw(LINES - 2, 0, "Up and Down arrow keys to naviage (F1 to Exit)");
+    mvprintw(LINES - 2, 0, "Use Arrow Keys to navigate (F1 to Exit)");
+    attroff(COLOR_PAIR(2));
 
+    
     // Set new current menu
     post_menu(menu);
     Menu::set_current_menu(this);
@@ -322,45 +310,11 @@ public:
    * constructor of UserPtr.
    *
    */
-  template<typename T>
+  template<typename T, typename... R>
   void add(const char * name,
-	   T & action) {
+	   T & action,
+	   R... data);
 
-    // It seems like you have to free the menu before messing around
-    // with menu_items
-    unpost_menu(menu);
-    free_menu(menu);
-    
-    // Set back button offset
-    int offset;
-    if(back_button == 0) offset = 1;
-    else offset = 2;
-    
-    // Add the new item onto the end of menu list
-    menu_items.insert(menu_items.end()-offset,
-		      new_item(name, "Default description")); // Before nullptr
-
-    // Add a new submenu pointer to the list
-    // The first argument is the action or submenu, the second is the higher
-    // level menu
-    user_pointers.push_back(new UserPtr_t<T>(action, *this)); // Deleted on clear_all?
-    
-    // Associate the new action to the last menu item
-    set_item_userptr(*(menu_items.end()-1-offset), (void*)user_pointers.back());
-    
-    // Create new menu
-    // Since std::vector<ITEM*> stores elements contiguously in
-    // memory, the required argument ITEM** is a pointer to the first
-    // element of menu_items.
-    //
-    //menu = new_menu(&menu_items[0]);
-    //if(menu == nullptr) abort();
-    create_menu();
-    
-    // This seems critical
-    refresh();
-  }
-  
   // Add a menu item
   void clear_all() {
 
@@ -401,3 +355,72 @@ public:
     
   }
 };
+
+// The placement of some of these template definitions is critical.
+// Firstly, they can't go in the source file (normally). The general
+// rule is that the template has to come before the place where it's
+// used, otherwise the compiler doesn't know which version to instantiate.
+// Putting them in a .cpp file would make them innaccessible in files that
+// include this .hpp file, and so you'd get linking errors when the compiler
+// hasn't generated the correct versions of the function.
+//
+// Secondly, there are circular dependencies between the Menu and UserPtr
+// classes, meaning it is not possible to place all the Menu stuff above
+// UserPtr or vice versa. In addition, the above template considerations also
+// apply inside this file (because both Menu and UserPtr use templates). The
+// current arrangement works because all template declarations appear before
+// they are used, and all functions are declared before they are used.
+
+
+// Constructor for switching from one menu to another
+template<typename... R>
+UserPtr_t<Menu, R...>::UserPtr_t( Menu & submenu, Menu & oldmenu, R... data)
+  : submenu(submenu), oldmenu(oldmenu), data(data...) {
+  
+  // Add a back button to the submenu
+  // Done here so that every submenu definitely gets a back button
+  submenu.add_back_button(&oldmenu);
+}
+
+template<typename... R>
+void UserPtr_t<Menu, R...>::execute() {
+  oldmenu.hide();
+  submenu.show();
+  // Set new current menu
+  Menu::set_current_menu(&submenu);
+}
+
+template<typename T, typename... R>
+void Menu::add(const char * name,
+	 T & action,
+	 R... data) {
+
+  // It seems like you have to free the menu before messing around
+  // with menu_items
+  unpost_menu(menu);
+  free_menu(menu);
+    
+  // Set back button offset
+  int offset;
+  if(back_button == 0) offset = 1;
+  else offset = 2;
+    
+  // Add the new item onto the end of menu list
+  menu_items.insert(menu_items.end()-offset,
+		    new_item(name, "Default description")); // Before nullptr
+
+  // Add a new submenu pointer to the list
+  // The first argument is the action or submenu, the second is the higher
+  // level menu
+  user_pointers.push_back(new UserPtr_t<T, R...>(action, *this, data...)); // Deleted on clear_all?
+    
+  // Associate the new action to the last menu item
+  set_item_userptr(*(menu_items.end()-1-offset), (void*)user_pointers.back());
+    
+  // Create the menu
+  create_menu();
+    
+  // This seems critical
+  refresh();
+}
+

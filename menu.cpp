@@ -36,18 +36,3 @@ Menu * Menu::current_menu = nullptr;
 int Menu::background_flag = 0;
 int Menu::background_running = 0;
 
-void UserPtr_t<Menu>::execute() {
-  oldmenu.hide();
-  submenu.show();
-  // Set new current menu
-  Menu::set_current_menu(&submenu);
-}
-
-// Constructor for switching from one menu to another
-UserPtr_t<Menu>::UserPtr_t( Menu & submenu, Menu & oldmenu)
-  : submenu(submenu), oldmenu(oldmenu) {
-  
-  // Add a back button to the submenu
-  // Done here so that every submenu definitely gets a back button
-  submenu.add_back_button(&oldmenu);
-}
