@@ -39,9 +39,9 @@ int main() {
   menu.add("Submenu", submenu);
 
   submenu.add("Subitem 1", test);
-  submenu.add("Subitem 2", test);
-  submenu.add("Subitem 3", test);
-  submenu.add("Subitem 4", test);
+  submenu.add("Subitem 2", test, 3, 2);
+  submenu.add("Subitem 3", test, "Test data");
+  submenu.add("Subitem 4", test, new int(5));
 
   submenu.add("Submenu", another);
   
