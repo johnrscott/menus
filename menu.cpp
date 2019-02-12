@@ -29,13 +29,19 @@ FancyTerm::~FancyTerm() {
   endwin();
 }  
 
-
-void MenuLink::execute() {
-  oldmenu.hide();
-  submenu.show();
-  // Set new current menu
-  Menu::set_current_menu(&submenu);
+// Constructor
+UserPtr_t<Menu & >::UserPtr_t(Menu & oldmenu, Menu & submenu)
+  : UserPtr(oldmenu), action(action) {
+  
+  call = [oldmenu, submenu](){
+    oldmenu.hide();
+    submenu.show();
+    // Set new current menu
+    Menu::set_current_menu(&submenu);
+  }
+  
 }
+
 
 // The menu that is currently visible
 Menu * Menu::current_menu = nullptr;
