@@ -15,6 +15,11 @@ void test() {
   clrtoeol();
   mvprintw(20, 0, "Test");
 }
+void test1() {
+  move(20, 0);
+  clrtoeol();
+  mvprintw(20, 0, "Test1");
+}
 
 int main() {
   
@@ -30,7 +35,7 @@ int main() {
   
   // Add menu items
   menu.add("Item 1", test);
-  menu.add("Item 2", test);
+  menu.add("Item 2", test1);
   menu.add("Submenu", submenu);
 
   submenu.add("Subitem 1", test);
