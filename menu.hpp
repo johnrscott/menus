@@ -250,6 +250,10 @@ public:
   void add_back_button(Menu * oldmenu) {
 
     // This code is run from the submenu object
+
+    // Check if there is already a back button
+    if(back_button == 1)
+      return; // Don't add another button
     
     // Store the previous menu (above the current menu)
     previous = oldmenu;
@@ -341,9 +345,7 @@ public:
     // This seems critical
     refresh();
   }
-
-
-  
+ 
   // Destructor (called when object is deleted)
   ~Menu() {
 

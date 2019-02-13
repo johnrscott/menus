@@ -7,56 +7,40 @@
  *
  */
 
+#include <string>
 #include "menu.hpp"
 
-// Probably needs to be static for compatibility with ncurses
-void test() {
-  move(20, 0);
-  clrtoeol();
-  mvprintw(20, 0, "Test");
-}
-void test1() {
-  move(20, 0);
-  clrtoeol();
-  mvprintw(20, 0, "Test1");
+void arg_test(){//std::string a, int b, double c) {
+  return;  
 }
 
 int main() {
   
   // Create ncurses background
   FancyTerm term;
+
+  // Menus
+  Menu string_menu;
+  Menu integer_menu; 
+  Menu fraction_menu;
+
+  // Choice of string
+  string_menu.add("ABC", integer_menu, "ABC");
+  string_menu.add("DEF", integer_menu, "DEF");
+  string_menu.add("GHI", integer_menu, "GHI");
   
-  // Menu object
-  Menu menu;
+  // Choice of integer
+  integer_menu.add("1", fraction_menu, 1);
+  integer_menu.add("2", fraction_menu, 2);
+  integer_menu.add("3", fraction_menu, 2);
 
-  // Submenu
-  Menu submenu;
-  Menu another;
-  
-  // Add menu items
-  menu.add("Item 1", test);
-  menu.add("Item 2", test1);
-  menu.add("Submenu", submenu);
+  // Choice of fraction
+  fraction_menu.add("0.1", arg_test, 0.1);
+  fraction_menu.add("0.2", arg_test, 0.2);
+  fraction_menu.add("0.3", arg_test, 0.3);  
 
-  submenu.add("Subitem 1", test);
-  submenu.add("Subitem 2", test, 3, 2);
-  submenu.add("Subitem 3", test, "Test data");
-  submenu.add("Subitem 4", test, new int(5));
-
-  submenu.add("Submenu", another);
-  
-  menu.show();
-
-  
-  //
-  
-  // Clear menu
-  //menu.clear_all();
-
-  // Add new items
-  //menu.add_action_item("New item 1", "Test item added dynamically", action);
-  //menu.add_action_item("New item 2", "Test item added dynamically", action);
-
+  // Show the top level menu
+  string_menu.show();
   
   // Stop program exiting
   while(1);
