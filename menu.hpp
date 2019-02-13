@@ -92,9 +92,27 @@ public:
 };
 
 
+// Non template base class for pointer declaration
+
 class Arguments {
+private:
 public:
-}
+  virtual ~Arguments() = 0; // To force abstract class
+};
+
+template<typename T, typename... R>
+class Arguments_t : public Arguments {
+private:
+  std::tuple<R...> args;
+public:
+  // Store a list of arguments
+  Arguments_t(R... args) : args(args...) { }
+  // Get args
+  std::tuple<R...> get_args() {
+    return args;
+  }
+  
+};
 
 /**
  * @brief Menu handling class
@@ -118,7 +136,7 @@ private:
   static int background_running; // Set to one when background is running
   std::vector<UserPtr * > user_pointers; // Holds submenu pointers
   std::function<void()> go_back; // Function to go back to previous menu
-  std::tuple<> args; // Holds the argument list for the final function
+  Arguments * args; // Holds the argument list for the final function
   
   WINDOW * menu_win;
     
@@ -217,6 +235,11 @@ public:
     // If not already started, start the background thread
     start_background();
 
+    // Initialise pointer to arguments
+    // I think maybe the type (void here) doesn't matter because
+    // the list of voids is zero length
+    args = new Arguments_t<void>();
+    
   }
 
   void create_menu() {
@@ -287,6 +310,9 @@ public:
   // Add arguments to the front of the args std::tuple
   template<typename... R>
   void add_args(R... new_args) {
+    auto old_args = args -> get_args();
+
+
     auto result = std::tuple_cat(std::tuple<R...>(new_args...), args);
     args = result;
   }
@@ -299,9 +325,9 @@ public:
 
   
   // Reset the args std::tuple
-  void reset_args() {
-    args = {}; // Is this what you would think it is...?
-  }
+  //void reset_args() {
+  //  args = {}; // Is this what you would think it is...?
+  //}
   
   // This method foregrounds the current menu, overwriting
   // whichever menu is currently in view
