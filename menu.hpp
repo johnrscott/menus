@@ -65,7 +65,7 @@ public:
     : action(action), oldmenu(oldmenu), data(data...) { }
 
   void execute() {
-    action(); // 
+    action();
   }
 };
 
@@ -92,6 +92,10 @@ public:
 };
 
 
+class Arguments {
+public:
+}
+
 /**
  * @brief Menu handling class
  *
@@ -114,6 +118,7 @@ private:
   static int background_running; // Set to one when background is running
   std::vector<UserPtr * > user_pointers; // Holds submenu pointers
   std::function<void()> go_back; // Function to go back to previous menu
+  std::tuple<> args; // Holds the argument list for the final function
   
   WINDOW * menu_win;
     
@@ -246,7 +251,7 @@ public:
   static void set_current_menu(Menu * menu) {
     Menu::current_menu = menu;
   }
-
+  
   void add_back_button(Menu * oldmenu) {
 
     // This code is run from the submenu object
@@ -277,6 +282,25 @@ public:
     // Indicate there is a back button
     back_button = 1;
 
+  }
+
+  // Add arguments to the front of the args std::tuple
+  template<typename... R>
+  void add_args(R... new_args) {
+    auto result = std::tuple_cat(std::tuple<R...>(new_args...), args);
+    args = result;
+  }
+
+  // Get arguments from the menu
+  template<typename... R>
+  std::tuple<R...> get_args() {
+    return args;
+  }
+
+  
+  // Reset the args std::tuple
+  void reset_args() {
+    args = {}; // Is this what you would think it is...?
   }
   
   // This method foregrounds the current menu, overwriting
@@ -387,7 +411,9 @@ UserPtr_t<Menu, R...>::UserPtr_t( Menu & submenu, Menu & oldmenu, R... data)
 template<typename... R>
 void UserPtr_t<Menu, R...>::execute() {
   oldmenu.hide();
+  auto old_args = oldmenu.get_args();
   submenu.show();
+  submenu.add_args(old_args);
   // Set new current menu
   Menu::set_current_menu(&submenu);
 }
